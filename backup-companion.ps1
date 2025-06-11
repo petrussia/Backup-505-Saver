@@ -22,7 +22,7 @@ Copy-Item -Path $SourceConfig -Destination "$RepoPath\$BackupName" -Force
 git add --all
 git commit -m "Автобэкап CompanionConfig $ts"
 # (если нет изменений — git commit вернёт ошибку, её можно игнорировать)
-git push origin main
+git push origin master
 
 # 7) Запустить Companion обратно (если останавливался выше)
 #    & sc.exe start CompanionServiceName
