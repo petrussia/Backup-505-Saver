@@ -11,7 +11,7 @@
 $RepoPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 
 $Targets = @(
-    # @{ Name = 'local_Bitfocus_configs'; Host = '127.0.0.1:8000' },
+    @{ Name = 'local_Bitfocus_configs'; Host = '127.0.0.1:8000' },
     @{ Name = '172_Bitfocus_configs'  ; Host = '172.18.191.23:8000' }
 )
 
