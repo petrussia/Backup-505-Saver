@@ -1,10 +1,10 @@
 #Requires -Version 5.1
 <#
-  Раздельный бэкап Bitfocus Companion 3.x
+  Раздельный бэкап Bitfocus Companion 3.5 делает следующее:
   – git pull (+ auto-stash, если есть локальные изменения)
   – создаёт / очищает подпапки: connections, buttons, surfaces, triggers, customVariables
   – скачивает каждый раздел в формате ZIP (.companionconfig)
-  – git add → commit → push
+  – закидывает всё на гит через git add → commit → push
 #>
 
 $CompanionHost = "172.18.191.23:8000"                       # IP:port Companion
@@ -14,9 +14,9 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference    = 'SilentlyContinue'
 $Sections = 'connections','buttons','surfaces','triggers','customVariables'
 
-# ── 0. Быстрая HTTP-проверка (не критично) ───────────────────────────────
-try { Invoke-WebRequest "http://$CompanionHost/status" -Method Head -TimeoutSec 3 -UseBasicParsing | Out-Null }
-catch { Write-Warning "$CompanionHost not reachable via HTTP, continuing…" }
+# ── 0. Тестовая HTTP-проверка ───────────────────────────────
+# try { Invoke-WebRequest "http://$CompanionHost/status" -Method Head -TimeoutSec 3 -UseBasicParsing | Out-Null }
+# catch { Write-Warning "$CompanionHost not reachable via HTTP, continuing…" }
 
 Set-Location -Path $RepoPath
 
@@ -49,7 +49,7 @@ foreach ($s in $Sections) {
     Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing
 }
 
-# ── 4. git commit + push (если каталог — репозиторий) ────────────────────
+# ── 4. git add всех файлов, commit + push ────────────────────
 if (Test-Path '.git') {
     git add --all
     if (git status --porcelain) {
