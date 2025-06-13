@@ -1,28 +1,64 @@
-# backup-companion.ps1
-# ---------------------------------------------
-# 1) Остановить Companion (если запущен как служба)
-#    & sc.exe stop CompanionServiceName
-#    -- или если запускаете вручную, уберите этот шаг
+#Requires -Version 5.1
+<#
+  Раздельный бэкап Bitfocus Companion 3.x
+  – git pull (+ auto-stash, если есть локальные изменения)
+  – создаёт / очищает подпапки: connections, buttons, surfaces, triggers, customVariables
+  – скачивает каждый раздел в формате ZIP (.companionconfig)
+  – git add → commit → push
+#>
 
-# 2) Путь к исходному конфигу Companion
-$SourceConfig = "C:\Users\user\Учёба\3 курс\ВидеоТехнологии\Backups\backup-505-saver\backup-companion.ps1"
+$CompanionHost = "172.18.191.23:8000"                       # IP:port Companion
+$RepoPath      = Split-Path -Parent $MyInvocation.MyCommand.Definition  # папка скрипта
 
-# 3) Папка локального git-репозитория для бэкапов
-$RepoPath     = "C:\Users\user\Учёба\3 курс\ВидеоТехнологии\Backups\backup-505-saver\"    # <– измени на свой путь
-Set-Location $RepoPath
+$ErrorActionPreference = 'Stop'
+$ProgressPreference    = 'SilentlyContinue'
+$Sections = 'connections','buttons','surfaces','triggers','customVariables'
 
-# 4) Имя бэкап-файла с меткой времени
-$ts           = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
-$BackupName   = "operator-2-pi_$ts.companionconfig"
+# ── 0. Быстрая HTTP-проверка (не критично) ───────────────────────────────
+try { Invoke-WebRequest "http://$CompanionHost/status" -Method Head -TimeoutSec 3 -UseBasicParsing | Out-Null }
+catch { Write-Warning "$CompanionHost not reachable via HTTP, continuing…" }
 
-# 5) Копируем файл
-Copy-Item -Path $SourceConfig -Destination "$RepoPath\$BackupName" -Force
+Set-Location -Path $RepoPath
 
-# 6) Фиксируем изменения в git
-git add --all
-git commit -m "Автобэкап CompanionConfig $ts"
-# (если нет изменений — git commit вернёт ошибку, её можно игнорировать)
-git push origin master
+# ── 1. git pull с авто-stash ─────────────────────────────────────────────
+if (Test-Path '.git') {
+    if (git status --porcelain) {
+        git stash push -u -m "auto-stash before pull" | Out-Null
+        $stashed = $true
+    }
+    git pull --quiet --rebase
+    if ($stashed) { git stash pop --quiet | Out-Null }
+}
 
-# 7) Запустить Companion обратно (если останавливался выше)
-#    & sc.exe start CompanionServiceName
+# ── 2. Создание / очистка подпапок ───────────────────────────────────────
+foreach ($s in $Sections) {
+    $folder = Join-Path -Path $RepoPath -ChildPath $s
+    if (Test-Path $folder) {
+        Remove-Item -Path "$folder\*" -Recurse -Force
+    } else {
+        New-Item -ItemType Directory -Path $folder | Out-Null
+    }
+}
+
+# ── 3. Скачивание ZIP-бэкапов ────────────────────────────────────────────
+foreach ($s in $Sections) {
+    $stamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+    $file  = Join-Path -Path (Join-Path -Path $RepoPath -ChildPath $s) -ChildPath "${s}_${stamp}.companionconfig"
+    $url   = "http://$CompanionHost/int/export/custom?${s}=1&format=zip&filename=$s"
+    Write-Host "--> $s"
+    Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing
+}
+
+# ── 4. git commit + push (если каталог — репозиторий) ────────────────────
+if (Test-Path '.git') {
+    git add --all
+    if (git status --porcelain) {
+        git commit -m ("Backup per-section {0}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm')) --quiet
+        git push --quiet
+        Write-Host "Backup committed & pushed."
+    } else {
+        Write-Host "No changes to commit."
+    }
+} else {
+    Write-Host "INFO: '$RepoPath' is not a git repo - commit/push skipped."
+}
