@@ -1,26 +1,27 @@
 #Requires -Version 5.1
 <#
-  Раздельный бэкап Bitfocus Companion 3.5 делает следующее:
-  – git pull (+ auto-stash, если есть локальные изменения)
-  – создаёт / очищает подпапки: connections, buttons, surfaces, triggers, customVariables
-  – скачивает каждый раздел в формате ZIP (.companionconfig)
-  – закидывает всё на гит через git add → commit → push
+  Раздельный бэкап Bitfocus Companion 3.5
+  • git pull (+ auto-stash, если есть изменения)
+  • Для КАЖДОГО из двух хостов:
+      ─ создаёт / очищает подпапки в каталоге  <Repo>\{local_Bitfocus_configs|172_Bitfocus_configs}\{connections|…}
+      ─ скачивает разделы в формате ZIP (.companionconfig)
+  • Затем загружает в репу git add → commit → push
 #>
 
-$CompanionHost = "172.18.191.23:8000"                       # IP:port Companion
-$RepoPath      = Split-Path -Parent $MyInvocation.MyCommand.Definition  # папка скрипта
+$RepoPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 
+$Targets = @(
+    # @{ Name = 'local_Bitfocus_configs'; Host = '127.0.0.1:8000' },
+    @{ Name = '172_Bitfocus_configs'  ; Host = '172.18.191.23:8000' }
+)
+
+$Sections = 'connections','buttons','surfaces','triggers','customVariables'
 $ErrorActionPreference = 'Stop'
 $ProgressPreference    = 'SilentlyContinue'
-$Sections = 'connections','buttons','surfaces','triggers','customVariables'
-
-# ── 0. Тестовая HTTP-проверка ───────────────────────────────
-# try { Invoke-WebRequest "http://$CompanionHost/status" -Method Head -TimeoutSec 3 -UseBasicParsing | Out-Null }
-# catch { Write-Warning "$CompanionHost not reachable via HTTP, continuing…" }
 
 Set-Location -Path $RepoPath
 
-# ── 1. git pull с авто-stash ─────────────────────────────────────────────
+# ---- git pull (auto-stash) ----------------------------------------------
 if (Test-Path '.git') {
     if (git status --porcelain) {
         git stash push -u -m "auto-stash before pull" | Out-Null
@@ -30,35 +31,49 @@ if (Test-Path '.git') {
     if ($stashed) { git stash pop --quiet | Out-Null }
 }
 
-# ── 2. Создание / очистка подпапок ───────────────────────────────────────
-foreach ($s in $Sections) {
-    $folder = Join-Path -Path $RepoPath -ChildPath $s
-    if (Test-Path $folder) {
-        Remove-Item -Path "$folder\*" -Recurse -Force
-    } else {
-        New-Item -ItemType Directory -Path $folder | Out-Null
+# ---- создаём / очищаем каталоги ------------------------------------------
+foreach ($t in $Targets) {
+    $base = Join-Path -Path $RepoPath -ChildPath $t.Name
+    if (-not (Test-Path $base)) { New-Item -ItemType Directory -Path $base | Out-Null }
+
+    foreach ($s in $Sections) {
+        $folder = Join-Path -Path $base -ChildPath $s
+        if (Test-Path $folder) {
+            Remove-Item -Path "$folder\*" -Recurse -Force
+        } else {
+            New-Item -ItemType Directory -Path $folder | Out-Null
+        }
     }
 }
 
-# ── 3. Скачивание ZIP-бэкапов ────────────────────────────────────────────
-foreach ($s in $Sections) {
-    $stamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
-    $file  = Join-Path -Path (Join-Path -Path $RepoPath -ChildPath $s) -ChildPath "${s}_${stamp}.companionconfig"
-    $url   = "http://$CompanionHost/int/export/custom?${s}=1&format=zip&filename=$s"
-    Write-Host "--> $s"
-    Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing
+# ---- скачиваем ZIP-бэкапы -------------------------------------------------
+foreach ($t in $Targets) {
+    $base       = Join-Path -Path $RepoPath -ChildPath $t.Name
+    $TargetHost = $t.Host
+
+    Write-Host "`n=== Export from $TargetHost → $t.Name ==="
+
+    foreach ($s in $Sections) {
+        $stamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+        $file  = Join-Path -Path (Join-Path -Path $base -ChildPath $s) -ChildPath "${s}_${stamp}.companionconfig"
+        $url   = "http://$TargetHost/int/export/custom?${s}=1&format=zip&filename=$s"
+
+        Write-Host "--> $s"
+        Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing
+    }
 }
 
-# ── 4. git add всех файлов, commit + push ────────────────────
+# ---- git add всех файлов + commit + push ----------------------------------------------------
 if (Test-Path '.git') {
     git add --all
     if (git status --porcelain) {
-        git commit -m ("Backup per-section {0}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm')) --quiet
+        $msg = "Dual-host backup $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+        git commit -m $msg --quiet
         git push --quiet
-        Write-Host "Backup committed & pushed."
+        Write-Host "`nBackup committed & pushed."
     } else {
-        Write-Host "No changes to commit."
+        Write-Host "`nNo changes to commit."
     }
 } else {
-    Write-Host "INFO: '$RepoPath' is not a git repo - commit/push skipped."
+    Write-Host "`nINFO: '$RepoPath' is not a git repo - commit/push skipped."
 }
