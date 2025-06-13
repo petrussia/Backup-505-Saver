@@ -63,17 +63,30 @@ foreach ($t in $Targets) {
     }
 }
 
-# ---- git add всех файлов + commit + push ----------------------------------------------------
+# ---- git add всех файлов + commit + push ---------------------------------
 if (Test-Path '.git') {
     git add --all
+
     if (git status --porcelain) {
         $msg = "Dual-host backup $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
         git commit -m $msg --quiet
-        git push --quiet
-        Write-Host "`nBackup committed & pushed."
-    } else {
+
+        # ------ push c перехватом ошибки  -------------------------------
+        $pushOutput = git push 2>&1
+        $exitCode   = $LASTEXITCODE
+
+        if ($exitCode -ne 0) {
+            Write-Error "`nGit push failed:`n$pushOutput"
+            exit $exitCode          # прерываем скрипт — ничего «Backup committed…» не выводим
+        }
+        else {
+            Write-Host "`nBackup committed & pushed."
+        }
+    }
+    else {
         Write-Host "`nNo changes to commit."
     }
-} else {
+}
+else {
     Write-Host "`nINFO: '$RepoPath' is not a git repo - commit/push skipped."
 }
