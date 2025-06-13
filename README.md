@@ -10,4 +10,4 @@
 - `CompanionHost` - любой ваш IPшник с портом, откуда экспортируются конфиги;  
 - `{s}` - какие именно из 5 параметров конфигов будут экспортироваться: `connections`,`buttons`,`surfaces`,`triggers`,`customVariables` ( для экспорта ставьте флаг 1 );  
 - format - `zip` либо `json-gz`;  
-- filename - имя скачанного файла
+- filename - имя скачанного файла.  
