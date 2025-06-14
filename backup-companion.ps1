@@ -66,7 +66,7 @@ foreach ($t in $Targets) {
     }
 }
 
-# ---- git add + commit + push (без шума) ---------------------------------
+# ---- git add + commit + push (полностью тихий) --------------------------
 if (Test-Path '.git') {
     git add --all
 
@@ -74,12 +74,10 @@ if (Test-Path '.git') {
         $msg = "Dual-host backup $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
         git commit -m $msg --quiet
 
-        # Тихий push: выводы в NUL, код возврата берём из ExitCode
-        $proc = Start-Process -FilePath git `
-                              -ArgumentList 'push', '--quiet' `
-                              -NoNewWindow -Wait -PassThru `
-                              -RedirectStandardOutput 'NUL' `
-                              -RedirectStandardError  'NUL'
+        # тихий push через cmd → всё выводится в NUL
+        $proc = Start-Process -FilePath cmd.exe `
+                              -ArgumentList '/c', 'git push --quiet >NUL 2>&1' `
+                              -NoNewWindow -Wait -PassThru
 
         if ($proc.ExitCode -ne 0) {
             Write-Error "Git push failed (exit code $($proc.ExitCode))"
@@ -92,4 +90,7 @@ if (Test-Path '.git') {
     else {
         Write-Host "`nNo changes to commit."
     }
+}
+else {
+    Write-Host "`nINFO: '$RepoPath' is not a git repo - commit/push skipped."
 }
