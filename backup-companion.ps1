@@ -74,18 +74,16 @@ if (Test-Path '.git') {
         $msg = "Dual-host backup $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
         git commit -m $msg --quiet
 
-        # Тихий push: stdout и stderr в null, код возврата сохраняем
+        # Тихий push: выводы в NUL, код возврата берём из ExitCode
         $proc = Start-Process -FilePath git `
                               -ArgumentList 'push', '--quiet' `
                               -NoNewWindow -Wait -PassThru `
-                              -RedirectStandardOutput $null `
-                              -RedirectStandardError  $null
+                              -RedirectStandardOutput 'NUL' `
+                              -RedirectStandardError  'NUL'
 
-        $exitCode = $proc.ExitCode
-
-        if ($exitCode -ne 0) {
-            Write-Error "Git push failed (exit code $exitCode)"
-            exit $exitCode
+        if ($proc.ExitCode -ne 0) {
+            Write-Error "Git push failed (exit code $($proc.ExitCode))"
+            exit $proc.ExitCode
         }
         else {
             Write-Host "`nBackup committed & pushed."
