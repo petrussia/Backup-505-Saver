@@ -6,6 +6,7 @@
       ─ создаёт/очищает подпапки connections|buttons|… в каталогах
         <Repo>\local_Bitfocus_configs  и  <Repo>\172_Bitfocus_configs
       ─ скачивает разделы в формате ZIP (.companionconfig)
+  • Копирует D:\Animated-Lower-Thirds\lower thirds  →  <Repo>\OBS_configs\
   • git add всей директории → commit → push
 #>
 
@@ -64,6 +65,22 @@ foreach ($t in $Targets) {
         Write-Host "--> $s"
         Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing
     }
+}
+
+# ── копируем Animated-Lower-Thirds → OBS_configs ─────────────────────────
+try {
+    $srcDir  = 'D:\Animated-Lower-Thirds\lower thirds'
+    $dstRoot = Join-Path -Path $RepoPath -ChildPath 'OBS_configs'
+    if (-not (Test-Path $dstRoot)) { New-Item -ItemType Directory -Path $dstRoot | Out-Null }
+
+    $dstDir = Join-Path -Path $dstRoot -ChildPath 'lower thirds'
+    if (Test-Path $dstDir) { Remove-Item -Path $dstDir -Recurse -Force }
+    Copy-Item -Path $srcDir -Destination $dstRoot -Recurse -Force
+
+    Write-Host "`nAnimated-Lower-Thirds copied → $dstDir"
+}
+catch {
+    Write-Warning "Cannot copy Animated-Lower-Thirds: $_"
 }
 
 # ---- git add + commit + push + вывод ошибок --------------------------
