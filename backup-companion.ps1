@@ -51,7 +51,7 @@ foreach ($t in $Targets) {
     $base       = Join-Path -Path $RepoPath -ChildPath $t.Name
     $TargetHost = $t.Host
 
-    Write-Host "`n=== Export from $TargetHost → $t.Name ==="
+    Write-Host "`n=== Export from $TargetHost → $($t['Name']) ==="
 
     foreach ($s in $Sections) {
         $stamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
@@ -63,7 +63,7 @@ foreach ($t in $Targets) {
     }
 }
 
-# ---- git add всех файлов + commit + push ---------------------------------
+# ── git add + commit + push ───────────────────────────────────
 if (Test-Path '.git') {
     git add --all
 
@@ -71,8 +71,8 @@ if (Test-Path '.git') {
         $msg = "Dual-host backup $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
         git commit -m $msg --quiet
 
-        # Push: захватываем stderr, но не считаем его ошибкой
-        $pushOutput = git push 2>&1 | Tee-Object -Variable _out -ErrorAction SilentlyContinue
+        # push без NativeCommandError
+        $pushOutput = (& git push 2>&1 | Out-String)
         $exitCode   = $LASTEXITCODE
 
         if ($exitCode -ne 0) {
@@ -86,7 +86,4 @@ if (Test-Path '.git') {
     else {
         Write-Host "`nNo changes to commit."
     }
-}
-else {
-    Write-Host "`nINFO: '$RepoPath' is not a git repo - commit/push skipped."
 }
