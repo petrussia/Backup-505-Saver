@@ -1,11 +1,12 @@
 #Requires -Version 5.1
 <#
   Раздельный бэкап Bitfocus Companion 3.5
-  • git pull (+ auto-stash, если есть изменения)
-  • Для КАЖДОГО из двух хостов:
-      ─ создаёт / очищает подпапки в каталоге  <Repo>\{local_Bitfocus_configs|172_Bitfocus_configs}\{connections|…}
+  • git pull с auto-stash
+  • Для двух хостов (local + 172):
+      ─ создаёт/очищает подпапки connections|buttons|… в каталогах
+        <Repo>\local_Bitfocus_configs  и  <Repo>\172_Bitfocus_configs
       ─ скачивает разделы в формате ZIP (.companionconfig)
-  • Затем загружает в репу git add → commit → push
+  • git add → commit → push (с проверкой кода выхода)
 #>
 
 $RepoPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
@@ -21,8 +22,9 @@ $ProgressPreference    = 'SilentlyContinue'
 
 Set-Location -Path $RepoPath
 
-# ---- git pull (auto-stash) ----------------------------------------------
+# ── git pull (auto-stash) ────────────────────────────────────────────────
 if (Test-Path '.git') {
+    $stashed = $false
     if (git status --porcelain) {
         git stash push -u -m "auto-stash before pull" | Out-Null
         $stashed = $true
@@ -31,7 +33,7 @@ if (Test-Path '.git') {
     if ($stashed) { git stash pop --quiet | Out-Null }
 }
 
-# ---- создаём / очищаем каталоги ------------------------------------------
+# ── создаём / очищаем каталоги ────────────────────────────────────────────
 foreach ($t in $Targets) {
     $base = Join-Path -Path $RepoPath -ChildPath $t.Name
     if (-not (Test-Path $base)) { New-Item -ItemType Directory -Path $base | Out-Null }
@@ -40,13 +42,14 @@ foreach ($t in $Targets) {
         $folder = Join-Path -Path $base -ChildPath $s
         if (Test-Path $folder) {
             Remove-Item -Path "$folder\*" -Recurse -Force
-        } else {
+        }
+        else {
             New-Item -ItemType Directory -Path $folder | Out-Null
         }
     }
 }
 
-# ---- скачиваем ZIP-бэкапы -------------------------------------------------
+# ── скачиваем ZIP-бэкапы ─────────────────────────────────────────────────
 foreach ($t in $Targets) {
     $base       = Join-Path -Path $RepoPath -ChildPath $t.Name
     $TargetHost = $t.Host
@@ -63,7 +66,7 @@ foreach ($t in $Targets) {
     }
 }
 
-# ── git add + commit + push ───────────────────────────────────
+# ── git add + commit + push (с проверкой) ────────────────────────────────
 if (Test-Path '.git') {
     git add --all
 
@@ -71,7 +74,7 @@ if (Test-Path '.git') {
         $msg = "Dual-host backup $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
         git commit -m $msg --quiet
 
-        # push без NativeCommandError
+        # push: собираем stdout+stderr в строку без генерации NativeCommandError
         $pushOutput = (& git push 2>&1 | Out-String)
         $exitCode   = $LASTEXITCODE
 
@@ -86,4 +89,7 @@ if (Test-Path '.git') {
     else {
         Write-Host "`nNo changes to commit."
     }
+}
+else {
+    Write-Host "`nINFO: '$RepoPath' is not a git repo - commit/push skipped."
 }
