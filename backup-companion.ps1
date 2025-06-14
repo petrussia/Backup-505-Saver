@@ -71,13 +71,13 @@ if (Test-Path '.git') {
         $msg = "Dual-host backup $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
         git commit -m $msg --quiet
 
-        # ------ push c перехватом ошибки  -------------------------------
-        $pushOutput = git push 2>&1
+        # Push: захватываем stderr, но не считаем его ошибкой
+        $pushOutput = git push 2>&1 | Tee-Object -Variable _out -ErrorAction SilentlyContinue
         $exitCode   = $LASTEXITCODE
 
         if ($exitCode -ne 0) {
             Write-Error "`nGit push failed:`n$pushOutput"
-            exit $exitCode          # прерываем скрипт — ничего «Backup committed…» не выводим
+            exit $exitCode
         }
         else {
             Write-Host "`nBackup committed & pushed."
