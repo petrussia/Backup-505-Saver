@@ -66,7 +66,7 @@ foreach ($t in $Targets) {
     }
 }
 
-# ── git add + commit + push (с проверкой) ────────────────────────────────
+# ── git add + commit + push (тихий режим) ────────────────────────────────
 if (Test-Path '.git') {
     git add --all
 
@@ -74,12 +74,12 @@ if (Test-Path '.git') {
         $msg = "Dual-host backup $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
         git commit -m $msg --quiet
 
-        # push: собираем stdout+stderr в строку без генерации NativeCommandError
-        $pushOutput = (& git push 2>&1 | Out-String)
-        $exitCode   = $LASTEXITCODE
+        # silent push
+        git push *> $null      # подавляем stdout и stderr
+        $exitCode = $LASTEXITCODE
 
         if ($exitCode -ne 0) {
-            Write-Error "`nGit push failed:`n$pushOutput"
+            Write-Error "Git push failed with exit code $exitCode"
             exit $exitCode
         }
         else {
@@ -89,7 +89,4 @@ if (Test-Path '.git') {
     else {
         Write-Host "`nNo changes to commit."
     }
-}
-else {
-    Write-Host "`nINFO: '$RepoPath' is not a git repo - commit/push skipped."
 }
