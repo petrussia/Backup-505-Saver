@@ -6,7 +6,7 @@
       ─ создаёт/очищает подпапки connections|buttons|… в каталогах
         <Repo>\local_Bitfocus_configs  и  <Repo>\172_Bitfocus_configs
       ─ скачивает разделы в формате ZIP (.companionconfig)
-  • git add → commit → push (с проверкой кода выхода)
+  • git add всей директории → commit → push
 #>
 
 $RepoPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
@@ -66,15 +66,13 @@ foreach ($t in $Targets) {
     }
 }
 
-# ---- git add + commit + push (полностью тихий) --------------------------
+# ---- git add + commit + push + вывод ошибок --------------------------
 if (Test-Path '.git') {
     git add --all
 
     if (git status --porcelain) {
         $msg = "Dual-host backup $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
         git commit -m $msg --quiet
-
-        # тихий push через cmd → всё выводится в NUL
         $proc = Start-Process -FilePath cmd.exe `
                               -ArgumentList '/c', 'git push --quiet >NUL 2>&1' `
                               -NoNewWindow -Wait -PassThru
