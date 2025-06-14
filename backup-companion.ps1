@@ -66,7 +66,7 @@ foreach ($t in $Targets) {
     }
 }
 
-# ── git add + commit + push (тихий режим) ────────────────────────────────
+# ---- git add + commit + push (без шума) ---------------------------------
 if (Test-Path '.git') {
     git add --all
 
@@ -74,12 +74,17 @@ if (Test-Path '.git') {
         $msg = "Dual-host backup $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
         git commit -m $msg --quiet
 
-        # silent push
-        git push *> $null      # подавляем stdout и stderr
-        $exitCode = $LASTEXITCODE
+        # Тихий push: stdout и stderr в null, код возврата сохраняем
+        $proc = Start-Process -FilePath git `
+                              -ArgumentList 'push', '--quiet' `
+                              -NoNewWindow -Wait -PassThru `
+                              -RedirectStandardOutput $null `
+                              -RedirectStandardError  $null
+
+        $exitCode = $proc.ExitCode
 
         if ($exitCode -ne 0) {
-            Write-Error "Git push failed with exit code $exitCode"
+            Write-Error "Git push failed (exit code $exitCode)"
             exit $exitCode
         }
         else {
